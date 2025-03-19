@@ -1,0 +1,14 @@
+apiVersion: v1
+entries:
+  kubestellar-ui:
+  - apiVersion: v2
+    appVersion: 1.16.0
+    created: "2025-03-20T00:01:40.49183735+05:30"
+    description: A Helm chart for Kubernetes
+    digest: 3b4382ff7487f6624d0baf6fb813c010f92dc10602f54de60b4d24b724e20cd0
+    name: kubestellar-ui
+    type: application
+    urls:
+    - https://mavrick-1.github.io/kubestellar-ui/kubestellar-ui-0.1.0.tgz
+    version: 0.1.0
+generated: "2025-03-20T00:01:40.491642855+05:30"

@@ -23,8 +23,7 @@ spec:
             - containerPort: {{ .Values.backend.port }}
           volumeMounts:
             - name: kubeconfig-volume
-              mountPath: /root/.kube
-              subPath: config
+              mountPath: /root/.kube # Mount the entire directory, not just "config"
           env:
             - name: KUBECONFIG
               value: "/root/.kube/config"

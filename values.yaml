@@ -1,0 +1,15 @@
+replicaCount: 1
+
+frontend:
+  image: mavrick1/kubestellar-f
+  port: 80
+
+backend:
+  image: mavrick1/kubestellar-b
+  port: 4000
+
+redis:
+  image: "redis:latest"
+  port: 6379
+
+kubeConfig: ""

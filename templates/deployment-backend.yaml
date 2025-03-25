@@ -1,3 +1,24 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: backend-sa
+  namespace: default
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: backend-admin-binding
+subjects:
+  - kind: ServiceAccount
+    name: backend-sa
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin  # Using built-in cluster-admin role with full permissions
+  apiGroup: rbac.authorization.k8s.io
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -12,10 +33,50 @@ spec:
       labels:
         app: backend
     spec:
+      serviceAccountName: backend-sa # Ensure this SA has access to the secrets
       volumes:
         - name: kubeconfig-volume
-          secret:
-            secretName: kubeconfig-secret
+          emptyDir: {}
+      initContainers:
+      - name: init-kubeconfig
+        image: public.ecr.aws/docker/library/alpine:latest
+        command: ["/bin/sh", "-c"]
+        args:
+            - |
+                set -e
+                echo "Installing kubectl..."
+                apk --no-cache add kubectl
+
+                echo "Creating kubeconfig directory..."
+                mkdir -p /root/.kube/
+                echo "Retrieving wds1 kubeconfig..."
+                if ! kubectl get secret admin-kubeconfig -n wds1-system; then
+                  echo "Error: admin-kubeconfig secret not found in wds1-system namespace"
+                  exit 1
+                fi
+                kubectl get secret admin-kubeconfig -n wds1-system -o jsonpath='{.data.kubeconfig-incluster}' | base64 -d > /root/.kube/wds1-config
+                cat /root/.kube/wds1-config
+
+
+                echo "Retrieving its1 kubeconfig..."
+                if ! kubectl get secret vc-vcluster -n its1-system; then
+                  echo "Error: vc-vcluster secret not found in its1-system namespace"
+                  exit 1
+                fi
+                kubectl get secret vc-vcluster -n its1-system -o jsonpath='{.data.config-incluster}' | base64 -d > /root/.kube/its1-config
+                cat /root/.kube/its1-config
+                echo "Properly merging kubeconfigs..."
+                # Merge kubeconfigs using KUBECONFIG environment variable
+                export KUBECONFIG="/root/.kube/wds1-config:/root/.kube/its1-config"
+                kubectl config view --flatten > /root/.kube/config
+                
+                echo "Setting permissions..."
+                chmod 600 /root/.kube/*
+                echo "Init container completed successfully"
+        volumeMounts:
+          - name: kubeconfig-volume
+            mountPath: /root/.kube
+
       containers:
         - name: backend
           image: {{ .Values.backend.image }}
@@ -23,7 +84,7 @@ spec:
             - containerPort: {{ .Values.backend.port }}
           volumeMounts:
             - name: kubeconfig-volume
-              mountPath: /root/.kube # Mount the entire directory, not just "config"
+              mountPath: /root/.kube
           env:
             - name: KUBECONFIG
               value: "/root/.kube/config"

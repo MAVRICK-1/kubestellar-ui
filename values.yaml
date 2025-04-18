@@ -1,11 +1,11 @@
 replicaCount: 1
 
 frontend:
-  image: mavrick1/kubestellar-f
+  image: mavrick1/kubestellar-f:latest
   port: 80
 
 backend:
-  image: mavrick1/kubestellar-b
+  image: mavrick1/kubestellar-b:latest
   port: 4000
 
 redis:

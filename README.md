@@ -4,7 +4,7 @@ Helm commands I used:
 ```
 helm repo add kubestellar-ui https://mavrick-1.github.io/kubestellar-ui/
 helm repo update
-helm install kubestellar-ui kubestellar-ui/kubestellar-ui --set kubeConfig="$( cat ~/.kube/config )"
+helm install kubestellar-ui kubestellar-ui/kubestellar-ui
 ```
 Port-forwarding commands:
 ```

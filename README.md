@@ -11,3 +11,4 @@ Port-forwarding commands:
 kubectl port-forward svc/frontend 5173:80 -n default
 kubectl port-forward svc/backend 4000:4000 -n default
 ```
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/kubestellar-ui)](https://artifacthub.io/packages/search?repo=kubestellar-ui)

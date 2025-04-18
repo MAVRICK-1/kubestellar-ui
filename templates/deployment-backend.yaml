@@ -3,7 +3,6 @@ kind: ServiceAccount
 metadata:
   name: backend-sa
   namespace: default
-
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -15,9 +14,8 @@ subjects:
     namespace: default
 roleRef:
   kind: ClusterRole
-  name: cluster-admin  # Using built-in cluster-admin role with full permissions
+  name: cluster-admin
   apiGroup: rbac.authorization.k8s.io
-
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -33,50 +31,119 @@ spec:
       labels:
         app: backend
     spec:
-      serviceAccountName: backend-sa # Ensure this SA has access to the secrets
+      serviceAccountName: backend-sa
       volumes:
         - name: kubeconfig-volume
           emptyDir: {}
       initContainers:
       - name: init-kubeconfig
-        image: public.ecr.aws/docker/library/alpine:latest
-        command: ["/bin/sh", "-c"]
+        image: bitnami/kubectl:latest
+        command: ["/bin/bash", "-c"]
         args:
             - |
                 set -e
-                echo "Installing kubectl..."
-                apk --no-cache add kubectl
-
                 echo "Creating kubeconfig directory..."
                 mkdir -p /root/.kube/
-                echo "Retrieving wds1 kubeconfig..."
-                if ! kubectl get secret admin-kubeconfig -n wds1-system; then
-                  echo "Error: admin-kubeconfig secret not found in wds1-system namespace"
-                  exit 1
+                
+                echo "Setting up the kind-kubeflex context first..."
+                # Get current cluster connection details
+                KUBERNETES_SERVICE_HOST=${KUBERNETES_SERVICE_HOST:-kubernetes.default.svc}
+                KUBERNETES_SERVICE_PORT=${KUBERNETES_SERVICE_PORT:-443}
+                CLUSTER_IP="${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}"
+                
+                # Use the serviceaccount token
+                SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+                CA_FILE="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+                
+                # Create initial kubeconfig for the host cluster
+                cat > /root/.kube/host-config << EOF_CONFIG
+                apiVersion: v1
+                kind: Config
+                current-context: kind-kubeflex
+                clusters:
+                - name: kind-kubeflex
+                  cluster:
+                    server: https://${CLUSTER_IP}
+                    certificate-authority: ${CA_FILE}
+                contexts:
+                - name: kind-kubeflex
+                  context:
+                    cluster: kind-kubeflex
+                    user: default-user
+                    namespace: default
+                users:
+                - name: default-user
+                  user:
+                    token: ${SA_TOKEN}
+                EOF_CONFIG
+                
+                export KUBECONFIG="/root/.kube/host-config"
+                
+                # Get all Control Planes
+                echo "Getting information about all ControlPlanes..."
+                CPS=$(kubectl get cp -o jsonpath='{.items[*].metadata.name}')
+                for CP in $CPS; do
+                  echo "Processing ControlPlane: $CP"
+                  
+                  # Get the secretRef details
+                  SECRET_NAME=$(kubectl get cp $CP -o jsonpath='{.status.secretRef.name}')
+                  SECRET_NS=$(kubectl get cp $CP -o jsonpath='{.status.secretRef.namespace}')
+                  IN_CLUSTER_KEY=$(kubectl get cp $CP -o jsonpath='{.status.secretRef.inClusterKey}')
+                  
+                  if [ -n "$SECRET_NAME" ] && [ -n "$SECRET_NS" ] && [ -n "$IN_CLUSTER_KEY" ]; then
+                    echo "Found secret details for $CP: $SECRET_NAME in namespace $SECRET_NS, key: $IN_CLUSTER_KEY"
+                    
+                    # Get the kubeconfig from the secret
+                    if kubectl get secret $SECRET_NAME -n $SECRET_NS &>/dev/null; then
+                      echo "Retrieving kubeconfig for $CP..."
+                      kubectl get secret $SECRET_NAME -n $SECRET_NS -o jsonpath="{.data.$IN_CLUSTER_KEY}" | base64 -d > /root/.kube/${CP}-config
+                      echo "Saved kubeconfig for $CP to /root/.kube/${CP}-config"
+                    else
+                      echo "Warning: Secret $SECRET_NAME not found in namespace $SECRET_NS"
+                    fi
+                  else
+                    echo "Warning: Could not get secret details for $CP"
+                  fi
+                done
+                
+                # Specifically check for wds1 and its1 if they weren't found above
+                echo "Checking for wds1 kubeconfig..."
+                if [ ! -f "/root/.kube/wds1-config" ] && kubectl get secret admin-kubeconfig -n wds1-system &>/dev/null; then
+                  echo "Retrieving wds1 kubeconfig directly..."
+                  kubectl get secret admin-kubeconfig -n wds1-system -o jsonpath='{.data.kubeconfig-incluster}' | base64 -d > /root/.kube/wds1-config
+                  echo "Saved kubeconfig for wds1 to /root/.kube/wds1-config"
                 fi
-                kubectl get secret admin-kubeconfig -n wds1-system -o jsonpath='{.data.kubeconfig-incluster}' | base64 -d > /root/.kube/wds1-config
-                cat /root/.kube/wds1-config
-
-
-                echo "Retrieving its1 kubeconfig..."
-                if ! kubectl get secret vc-vcluster -n its1-system; then
-                  echo "Error: vc-vcluster secret not found in its1-system namespace"
-                  exit 1
+                
+                echo "Checking for its1 kubeconfig..."
+                if [ ! -f "/root/.kube/its1-config" ] && kubectl get secret vc-vcluster -n its1-system &>/dev/null; then
+                  echo "Retrieving its1 kubeconfig directly..."
+                  kubectl get secret vc-vcluster -n its1-system -o jsonpath='{.data.config-incluster}' | base64 -d > /root/.kube/its1-config
+                  echo "Saved kubeconfig for its1 to /root/.kube/its1-config"
                 fi
-                kubectl get secret vc-vcluster -n its1-system -o jsonpath='{.data.config-incluster}' | base64 -d > /root/.kube/its1-config
-                cat /root/.kube/its1-config
-                echo "Properly merging kubeconfigs..."
-                # Merge kubeconfigs using KUBECONFIG environment variable
-                export KUBECONFIG="/root/.kube/wds1-config:/root/.kube/its1-config"
+                
+                echo "Merging all kubeconfigs..."
+                # Collect all config files
+                CONFIG_FILES="/root/.kube/host-config"
+                for CONFIG in /root/.kube/*-config; do
+                  if [ "$CONFIG" != "/root/.kube/host-config" ]; then
+                    CONFIG_FILES="$CONFIG_FILES:$CONFIG"
+                  fi
+                done
+                
+                # Merge all configs
+                export KUBECONFIG="$CONFIG_FILES"
                 kubectl config view --flatten > /root/.kube/config
                 
                 echo "Setting permissions..."
                 chmod 600 /root/.kube/*
+                
+                echo "Available contexts:"
+                kubectl config get-contexts
+                
                 echo "Init container completed successfully"
         volumeMounts:
           - name: kubeconfig-volume
             mountPath: /root/.kube
-
       containers:
         - name: backend
           image: {{ .Values.backend.image }}
@@ -92,3 +159,16 @@ spec:
               value: "redis"
             - name: REDIS_PORT
               value: "{{ .Values.redis.port }}"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: default
+spec:
+  selector:
+    app: backend
+  ports:
+  - port: 80
+    targetPort: {{ .Values.backend.port }}
+  type: ClusterIP

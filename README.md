@@ -8,6 +8,6 @@ helm install kubestellar-ui kubestellar-ui/kubestellar-ui --set kubeConfig="$( c
 ```
 Port-forwarding commands:
 ```
-kubectl port-forward svc/frontend 8080:80 -n default
+kubectl port-forward svc/frontend 5173:80 -n default
 kubectl port-forward svc/backend 4000:4000 -n default
 ```

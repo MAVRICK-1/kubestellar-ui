@@ -9,6 +9,6 @@ entries:
     name: kubestellar-ui
     type: application
     urls:
-    - https://mavrick-1.github.io/kubestellar-ui/kubestellar-ui-0.1.0.tgz
-    version: 0.1.0
+    - https://mavrick-1.github.io/kubestellar-ui/kubestellar-ui-0.1.1.tgz
+    version: 0.1.1
 generated: "2025-03-20T00:22:08.487698688+05:30"

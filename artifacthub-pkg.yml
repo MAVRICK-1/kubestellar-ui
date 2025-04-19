@@ -1,0 +1,12 @@
+version: 0.1.0
+name: kubestellar-ui
+maintainers:
+  - name: Rishi Mondal
+    email: mavrickrishi@gmail.com
+keywords:
+  - kubestellar
+  - ui
+  - helm
+links:
+  - name: GitHub
+    url: https://github.com/mavrick-1/kubestellar-ui

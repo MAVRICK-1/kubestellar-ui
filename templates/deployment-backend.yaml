@@ -278,11 +278,23 @@ spec:
               value: "redis"
             - name: REDIS_PORT
               value: "{{ .Values.redis.port }}"
-            # Add CORS-related environment variables
-            - name: ALLOW_ORIGIN
-              value: "http://localhost:8080"
-            - name: CORS_ENABLED
-              value: "true"
+
+          # Add Redis sidecar container
+        
+     # Add Redis sidecar container
+        - name: redis-sidecar
+          image: redis:7.0-alpine
+          ports:
+            - containerPort: 6379
+              # Listen on localhost (::1) which is what the backend is hardcoded to use
+              hostIP: ::1
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
 ---
 apiVersion: v1
 kind: Service

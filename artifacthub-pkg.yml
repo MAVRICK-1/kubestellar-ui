@@ -1,4 +1,4 @@
-version: 0.1.0
+version: 0.1.2
 name: kubestellar-ui
 maintainers:
   - name: Rishi Mondal
@@ -10,5 +10,5 @@ keywords:
 links:
   - name: GitHub
     url: https://github.com/mavrick-1/kubestellar-ui
-icon: https://raw.githubusercontent.com/mavrick-1/kubestellar-ui/image.png
+icon: https://raw.githubusercontent.com/MAVRICK-1/kubestellar-ui/refs/heads/master/image.png
 

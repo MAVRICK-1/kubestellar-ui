@@ -2,7 +2,6 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: backend-sa
-  namespace: default
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -11,7 +10,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: backend-sa
-    namespace: default
+    namespace: {{ .Release.Namespace }}
 roleRef:
   kind: ClusterRole
   name: cluster-admin
@@ -175,32 +174,32 @@ spec:
                 # Create a startup script for the backend container to rename context
                 cat > /home/kubeconfig/rename-context.sh << 'EOF'
                 #!/bin/bash
-                
+
                 # Function to rename context
                 rename_context() {
                   echo "Checking for my-vcluster context..."
-                  
+
                   # Check if my-vcluster context exists
                   if kubectl config get-contexts my-vcluster &>/dev/null; then
                     echo "Found my-vcluster context, renaming to its1..."
-                    
+
                     # Try the standard rename first
                     if kubectl config rename-context my-vcluster its1; then
                       echo "Successfully renamed my-vcluster to its1"
                     else
                       echo "Standard rename failed, trying alternative method..."
-                      
+
                       # Get details from my-vcluster context
                       CLUSTER=$(kubectl config view -o jsonpath='{.contexts[?(@.name=="my-vcluster")].context.cluster}')
                       USER=$(kubectl config view -o jsonpath='{.contexts[?(@.name=="my-vcluster")].context.user}')
                       NAMESPACE=$(kubectl config view -o jsonpath='{.contexts[?(@.name=="my-vcluster")].context.namespace}')
-                      
+
                       # Create new context with same details but different name
                       kubectl config set-context its1 --cluster="$CLUSTER" --user="$USER" --namespace="$NAMESPACE"
-                      
+
                       # Delete old context
                       kubectl config delete-context my-vcluster
-                      
+
                       echo "Created its1 context and deleted my-vcluster"
                     fi
                   else
@@ -211,7 +210,7 @@ spec:
                       echo "my-vcluster context not found and its1 doesn't exist. Something is wrong!"
                     fi
                   fi
-                  
+
                   echo "Available contexts after renaming:"
                   kubectl config get-contexts
                 }
@@ -220,7 +219,7 @@ spec:
                 for i in {1..5}; do
                   echo "Attempt $i to rename context..."
                   rename_context
-                  
+
                   # Check if its1 now exists
                   if kubectl config get-contexts its1 &>/dev/null; then
                     echo "its1 context exists, renaming successful!"
@@ -234,10 +233,10 @@ spec:
                 # Update the config file after renaming
                 kubectl config view --flatten > /home/kubeconfig/updated-config
                 cp /home/kubeconfig/updated-config /home/kubeconfig/config
-                
+
                 echo "Context renaming process completed"
                 EOF
-                
+
                 chmod +x /home/kubeconfig/rename-context.sh
                 echo "Created context renaming script for backend container"
                 echo "Init container completed successfully"
@@ -253,13 +252,13 @@ spec:
               # Run the context renaming script
               echo "Running context renaming script..."
               /home/kubeconfig/rename-context.sh
-              
+
               # Source the .env file if it exists (as per Dockerfile)
               if [ -f "/root/.env" ]; then
                 echo "Sourcing environment variables from /root/.env"
                 source /root/.env
               fi
-              
+
               # Execute the backend (which is in /root according to Dockerfile)
               echo "Starting backend from /root/backend"
               exec /root/backend
@@ -280,7 +279,7 @@ spec:
               value: "{{ .Values.redis.port }}"
 
           # Add Redis sidecar container
-        
+
      # Add Redis sidecar container
         - name: redis-sidecar
           image: redis:7.0-alpine
@@ -300,7 +299,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: backend-service
-  namespace: default
 spec:
   selector:
     app: backend

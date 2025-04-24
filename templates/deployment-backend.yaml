@@ -36,7 +36,7 @@ spec:
           emptyDir: {}
       initContainers:
       - name: init-kubeconfig
-        image: bitnami/kubectl:latest
+        image: quay.io/kubestellar/kubectl:{{.Values.KUBECTL_VERSION}}
         command: ["/bin/bash", "-c"]
         args:
             - |

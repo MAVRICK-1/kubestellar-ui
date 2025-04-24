@@ -26,3 +26,6 @@ redis:
 
 
 kubeConfig: ""
+
+# Container/chart image versions, please do not change them unless you know what you are doing.
+KUBECTL_VERSION: "1.31.0"
